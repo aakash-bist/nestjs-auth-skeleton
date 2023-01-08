@@ -5,17 +5,17 @@ import { PassportStrategy } from '@nestjs/passport';
 import { JwtPayload } from './jwt-payload.interface';
 import { ConfigService } from '../core/config/config.service';
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh-token') {
 
     constructor(private authService: AuthService, private configService: ConfigService) {
         super({
-            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-            secretOrKey: configService.get('JWT_ACCESS_TOKEN_SECRET'),
-            ignoreExpiration: false,
+            jwtFromRequest: ExtractJwt.fromBodyField('refresh_token'),
+            secretOrKey: configService.get('JWT_REFRESH_TOKEN_SECRET'),
+            ignoreExpiration: true,
         });
     }
     
-    async validate(payload: JwtPayload) {
+    async validate(payload: JwtPayload) {        
         const user = await this.authService.validateUserByJwt(payload);
         if (!user) {
             throw new UnauthorizedException();

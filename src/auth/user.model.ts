@@ -24,7 +24,9 @@ export const UserSchema = new mongoose.Schema({
         type: [],
         default: [Role.User]
     },
-
+    refreshToken: {
+        type: String
+    }
 }, { timestamps: true });
 
 export const TokenVerifyEmailSchema = new mongoose.Schema({
@@ -60,6 +62,10 @@ UserSchema.methods.checkPassword = function (attempt, callback) {
     });
 };
 
+UserSchema.methods.compareRefreshTokens = async function (refreshToken:string): Promise<boolean>{
+    return bcrypt.compareAsync(refreshToken, this.refreshToken)
+}
+
 export interface User extends mongoose.Document {
     _id: string;
     email: string;
@@ -67,6 +73,7 @@ export interface User extends mongoose.Document {
     password: string;
     emailVerified: Boolean;
     roles: Role[];
+    refreshToken: string
 }
 
 
