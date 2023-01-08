@@ -51,3 +51,9 @@ export class UpdateUserDto {
     @ApiProperty()
     name: string;
 }
+
+export class RefreshTokenDto{
+    @IsString()
+    @ApiProperty()
+    refresh_token: string;
+}

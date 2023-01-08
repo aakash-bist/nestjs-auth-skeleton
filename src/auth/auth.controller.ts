@@ -1,11 +1,12 @@
 import { Controller, Get, Post, Body, Put, ValidationPipe, Param, UseGuards, Delete } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { AuthCredentialsDto, AuthEmailDto, CreateUserDto, UpdateUserDto } from './dto/auth-credentials.dto';
+import { AuthCredentialsDto, AuthEmailDto, CreateUserDto, RefreshTokenDto, UpdateUserDto } from './dto/auth-credentials.dto';
 import { JwtAuthGuard } from '../core/guard/jwt-auth.guard';
 import { Role } from '../core/enums/role.enum';
 import { Roles } from '../core/decorators/role.decorator';
 import { RolesGuard } from '../core/guard/roles.guard';
+import { JwtRefreshTokenGuard } from '../core/guard/jwt-refresh-token.guard';
 
 @Controller('auth')
 @ApiTags('Authentication')
@@ -68,4 +69,22 @@ export class AuthController {
   async delete(@Body(ValidationPipe) auth: AuthEmailDto) {
     return await this.authService.deleteUser(auth);
   }
+
+  @ApiOperation({ summary: 'Get access token using refresh token' })
+  @ApiBearerAuth()
+  @UseGuards(JwtRefreshTokenGuard)
+  @Post('/refresh-token')
+  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
+    return await this.authService.createAccessTokenFromRefreshToken(refreshTokenDto);
+  }
+
+  @ApiOperation({ summary: 'Logout' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('/logout')
+  async logout(@Body() auth: AuthEmailDto) {
+    return await this.authService.removeRefreshToken(auth);
+  }
+
+
 }

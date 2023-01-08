@@ -10,6 +10,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ConfigService } from '../core/config/config.service';
 import { SendEmailMiddleware } from '../core/middleware/send-email.middleware';
+import { JwtRefreshStrategy } from './jwt.refresh.strategy';
 
 @Module({
   imports: [
@@ -17,17 +18,19 @@ import { SendEmailMiddleware } from '../core/middleware/send-email.middleware';
       { name: 'User', schema: UserSchema },
       { name: 'TokenVerifyEmail', schema: TokenVerifyEmailSchema }
     ]),
-    PassportModule.register({ defaultStrategy: 'jwt', session: true }),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secretOrPrivateKey: configService.get('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get('EXPIRES_IN')
-        }
-      }),
-      inject: [ConfigService],
-    }),
+    // PassportModule.register({ defaultStrategy: 'jwt', session: true }),
+    // JwtModule.registerAsync({
+    //   imports: [ConfigModule],
+    //   useFactory: async (configService: ConfigService) => ({
+    //     secret: configService.get('JWT_ACCESS_TOKEN_SECRET'),
+    //     signOptions: {
+    //       expiresIn: configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME')
+    //     }
+    //   }),
+    //   inject: [ConfigService],
+    // }),
+    PassportModule.register({}),
+    JwtModule.register({}),
     MailerModule.forRootAsync({
       useFactory: () => ({
         transport: {
@@ -35,13 +38,13 @@ import { SendEmailMiddleware } from '../core/middleware/send-email.middleware';
           auth: { user: 'shivenbist@gmail.com', pass: 'nmrcqsjtshbzrgbn' }
         },
         // defaults: {
-        //   from: '"Api" <akunsejutacitatesting@gmail.com>',
+        //   from: '',
         // },
       }),
     }),
     ConfigModule,
   ],
-  providers: [AuthService, JwtStrategy, SendEmailMiddleware],
+  providers: [AuthService, JwtStrategy, JwtRefreshStrategy, SendEmailMiddleware],
   controllers: [AuthController]
 })
 export class AuthModule { }

@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, BadRequestException, ArgumentsHost } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AuthCredentialsDto, AuthEmailDto, CreateUserDto, UpdateUserDto } from './dto/auth-credentials.dto';
-import { AuthLoginMetadata, JwtPayload } from './jwt-payload.interface';
+import { AuthCredentialsDto, AuthEmailDto, CreateUserDto, RefreshTokenDto, UpdateUserDto } from './dto/auth-credentials.dto';
+import { AuthLoginMetadata, JwtOptions, JwtPayload } from './jwt-payload.interface';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { TokenVerifyEmail, User, } from './user.model';
@@ -10,8 +10,9 @@ import { SendEmailMiddleware } from './../core/middleware/send-email.middleware'
 import { RequestContextMetadataService } from '../core/services/request-context-metadata.service';
 import { ConfigService } from '../core/config/config.service';
 import { Role } from '../core/enums/role.enum';
-import { use } from 'passport';
 import { verifyEmailTemplate } from '../core/utils/templates'
+import * as bcrypt from 'bcrypt';
+
 @Injectable()
 export class AuthService {
     constructor(
@@ -87,7 +88,6 @@ export class AuthService {
                                     name: updateUserDto.name
                                 },
                                 { new: true }).then(user => {
-                                    console.log('### User Updated ###', user.toObject({ versionKey: false }));
                                     return user;
                                 });
                         } else {
@@ -112,20 +112,45 @@ export class AuthService {
                 }
                 if (isMatch) {
                     const payload: any = {
-                        token: this.createJwtPayload(userToAttempt),
+                        access_token: this.createJwtPayload('access_token', userToAttempt),
+                        refresh_token: this.createJwtPayload('refresh_token', userToAttempt),
                     }
                     const user = userToAttempt.toObject({ versionKey: false });
                     if (user.emailVerified) {
                         RequestContextMetadataService.setMetadata('AUTH_METADATA', user);
-                        resolve(payload);
+                        this.userModel.findByIdAndUpdate(
+                            { _id: user._id },
+                            {
+                                refreshToken: payload.refresh_token
+                            }, 
+                            { new: true }).then(_ => {
+                                resolve(payload);
+                            })
                     } else {
                         reject(new UnauthorizedException('Please verify your email before login.'));
                     }
                 } else {
-                    reject(new BadRequestException(`Password don't match`));
+                    reject(new BadRequestException(`Password doesn't match`));
                 }
             });
         });
+    }
+
+    async createAccessTokenFromRefreshToken(refreshTokenDto: RefreshTokenDto) {
+        const { refresh_token } = refreshTokenDto;
+        const decoded = this.jwtService.decode(refresh_token) as AuthLoginMetadata;
+        if (!decoded) {
+            throw new UnauthorizedException();
+        }
+        const user: any = await this.findOneByEmail(decoded.email);
+        if (!user) throw new BadRequestException('Email not found !');
+        await this.jwtService.verifyAsync(refresh_token, {
+            secret: this.configService.get('JWT_REFRESH_TOKEN_SECRET')
+        })
+        const payload: any = {
+            access_token: this.createJwtPayload('access_token', user),
+        }
+        return payload;
     }
 
     async findOneByEmail(email: string): Promise<User> {
@@ -160,13 +185,26 @@ export class AuthService {
         }
     }
 
-    createJwtPayload(user) {
+    createJwtPayload(type, user) {
         let data: JwtPayload = {
             _id: user._id,
             roles: user.roles,
             email: user.email
         };
-        return this.jwtService.sign(data);
+        let jwtOptions: JwtOptions;
+        if (type === 'access_token') {
+            jwtOptions = {
+                secret: this.configService.get('JWT_ACCESS_TOKEN_SECRET'),
+                expiresIn: `${this.configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME')}s`
+            }
+        } else if (type === 'refresh_token') {
+            jwtOptions = {
+                secret: this.configService.get('JWT_REFRESH_TOKEN_SECRET'),
+                expiresIn: `${this.configService.get('JWT_REFRESH_TOKEN_EXPIRATION_TIME')}s`
+            }
+        }
+
+        return this.jwtService.sign(data, jwtOptions);
     }
 
     async verifyTokenByEmail(token: string) {
@@ -190,5 +228,12 @@ export class AuthService {
         }
     }
 
+    async removeRefreshToken(auth: AuthEmailDto) {
+        const user:any = await this.findOneByEmail(auth.email);
+        if (!user) throw new BadRequestException('Email not found !');
+        return this.userModel.updateOne({email:user.email}, {
+          refreshToken: null
+        });
+     }
 }
 
