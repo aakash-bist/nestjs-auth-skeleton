@@ -9,15 +9,21 @@ import { RolesGuard } from './core/guard/roles.guard';
 import { SeedsModule } from './seeds/seed.module';
 
 @Module({
-  imports: [ConfigModule, MongooseModule.forRootAsync({
-    imports: [ConfigModule],
-    useFactory: async (configService: ConfigService) => ({
-      uri: `${configService.get('DB_URL')}`,
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+  imports: [
+    ConfigModule,
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        uri: `${configService.get('DB_URL')}`,
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      }),
+      inject: [ConfigService],
     }),
-    inject: [ConfigService]
-  }), AuthModule, WinstonModule, SeedsModule],
+    AuthModule,
+    WinstonModule,
+    SeedsModule,
+  ],
   providers: [
     {
       provide: APP_GUARD,
